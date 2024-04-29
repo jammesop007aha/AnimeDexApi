@@ -1,6 +1,5 @@
-name = "api3"
-main = "src/index.js"
-compatibility_date = "2023-10-10"
-type = "javascript"
+name = "my_worker"
+main = "worker.js"
+compatibility_date = "2023-04-01"
+type = "module"
 workers_dev = true
-node_compat = true
