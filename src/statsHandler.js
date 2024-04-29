@@ -1,44 +1,61 @@
-const CACHE = {}
-
+const CACHE = {};
+const CACHE_EXPIRATION_TIME = 60 * 60 * 1000; // Cache expires after 1 hour
 
 async function increaseViews(headers) {
-    try {
-        let referer = String(headers.get("Referer"));
-        if (referer == 'null') {
-            referer = String(headers.get("referer"));
-        }
-        if (referer == 'null') {
-            referer = "direct";
-        }
-        else {
-            try {
-                const url = new URL(referer);
-                referer = url.origin
-            }
-            catch (e) {
-                console.log(e)
-            }
-        }
-        const website = referer
-        console.log(website)
+  try {
+    const referer = getReferer(headers);
+    const website = getWebsite(referer);
+    console.log(`Updating cache for website: ${website}`);
 
-        if (CACHE[website]) {
-            CACHE[website] += 1
-        } else {
-            CACHE[website] = 1
-        }
-
-        if (CACHE[website] < 10) {
-            return
-        }
-
-        const url = 'https://statsapi-production-871f.up.railway.app/increaseViews'
-        await fetch(url, { headers: { 'Referer': website } })
-
-        CACHE[website] = 0
-    } catch (e) {
-        console.log(e)
+    if (CACHE[website]) {
+      CACHE[website].views += 1;
+      CACHE[website].lastUpdated = Date.now();
+      console.log(`Updated cache for website: ${website}`);
+    } else {
+      CACHE[website] = { views: 1, lastUpdated: Date.now() };
     }
+
+    if (CACHE[website].views < 10) {
+      return;
+    }
+
+    if (isCacheExpired(CACHE[website])) {
+      console.log(`Cache for website: ${website} has expired. Fetching new data.`);
+      const url = 'https://statsapi-production-871f.up.railway.app/increaseViews';
+      const fetchResponse = await fetch(url, { headers: { 'Referer': website } });
+
+      if (!fetchResponse.ok) {
+        throw new Error(`Failed to fetch data from ${url}. Status code: ${fetchResponse.status}`);
+      }
+
+      CACHE[website].lastUpdated = Date.now();
+      console.log(`Fetched new data for website: ${website}`);
+    }
+
+    CACHE[website].views = 0;
+  } catch (e) {
+    console.log(e);
+  }
 }
 
-export { increaseViews }
+function getReferer(headers) {
+  let referer = headers.get("Referer") || headers.get("referer");
+  if (referer) {
+    try {
+      return new URL(referer).origin;
+    } catch (e) {
+      console.log(e);
+    }
+  }
+  return "direct";
+}
+
+function getWebsite(referer) {
+  return referer;
+}
+
+function isCacheExpired(cacheEntry) {
+  return Date.now() - cacheEntry.lastUpdated > CACHE_EXPIRATION_TIME;
+}
+
+export { increaseViews };
